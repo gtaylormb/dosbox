@@ -1534,6 +1534,7 @@ private:
 		else if (!strcasecmp(omode,"dualopl2")) opl_mode=OPL_dualopl2;
 		else if (!strcasecmp(omode,"opl3")) opl_mode=OPL_opl3;
 		else if (!strcasecmp(omode,"opl3gold")) opl_mode=OPL_opl3gold;
+		else if (!strcasecmp(omode,"opl3fpga")) opl_mode=OPL_opl3fpga;
 		/* Else assume auto */
 		else {
 			switch (type) {
@@ -1592,6 +1593,9 @@ public:
 		case OPL_opl3gold:
 			OPL_Init(section,oplmode);
 			break;
+		case OPL_opl3fpga:
+			OPL3FPGA_Init(sb.hw.base);
+			break;
 		}
 		if (sb.type==SBT_NONE || sb.type==SBT_GB) return;
 
@@ -1649,6 +1653,9 @@ public:
 		case OPL_opl3:
 		case OPL_opl3gold:
 			OPL_ShutDown(m_configuration);
+			break;
+		case OPL_opl3fpga:
+			OPL3FPGA_Shutdown();
 			break;
 		}
 		if (sb.type==SBT_NONE || sb.type==SBT_GB) return;
