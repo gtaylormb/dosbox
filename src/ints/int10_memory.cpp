@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2015  The DOSBox Team
+ *  Copyright (C) 2002-2017  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -242,7 +242,7 @@ void INT10_SetupRomMemory(void) {
 	INT10_SetupRomMemoryChecksum();
 
 	if (IS_TANDY_ARCH) {
-		RealSetVec(0x44,int10.rom.font_8_first);
+		RealSetVec(0x44,RealMake(0xf000,0xfa6e));
 	}
 }
 

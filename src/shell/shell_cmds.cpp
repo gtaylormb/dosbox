@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2015  The DOSBox Team
+ *  Copyright (C) 2002-2017  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -1235,7 +1235,16 @@ void DOS_Shell::CMD_VER(char *args) {
 		char* word = StripWord(args);
 		if(strcasecmp(word,"set")) return;
 		word = StripWord(args);
-		dos.version.major = (Bit8u)(atoi(word));
-		dos.version.minor = (Bit8u)(atoi(args));
+		if (!*args && !*word) { //Reset
+			dos.version.major = 5;
+			dos.version.minor = 0;
+		} else if (*args == 0 && *word && (strchr(word,'.') != 0)) { //Allow: ver set 5.1
+			const char * p = strchr(word,'.');
+			dos.version.major = (Bit8u)(atoi(word));
+			dos.version.minor = (Bit8u)(atoi(p+1));
+		} else { //Official syntax: ver set 5 2
+			dos.version.major = (Bit8u)(atoi(word));
+			dos.version.minor = (Bit8u)(atoi(args));
+		}
 	} else WriteOut(MSG_Get("SHELL_CMD_VER_VER"),VERSION,dos.version.major,dos.version.minor);
 }

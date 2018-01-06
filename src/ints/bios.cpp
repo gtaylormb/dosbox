@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2015  The DOSBox Team
+ *  Copyright (C) 2002-2017  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -591,10 +591,6 @@ static Bitu INT17_Handler(void) {
 	case 0x02:		/* PRINTER: Get Status */
 		reg_ah=0;	
 		break;
-	case 0x20:		/* Some sort of printerdriver install check*/
-		break;
-	default:
-		E_Exit("Unhandled INT 17 call %2X",reg_ah);
 	};
 	return CBRET_NONE;
 }
@@ -724,9 +720,6 @@ static Bitu INT14_Handler(void) {
 static Bitu INT15_Handler(void) {
 	static Bit16u biosConfigSeg=0;
 	switch (reg_ah) {
-	case 0x06:
-		LOG(LOG_BIOS,LOG_NORMAL)("INT15 Unkown Function 6");
-		break;
 	case 0xC0:	/* Get Configuration*/
 		{
 			if (biosConfigSeg==0) biosConfigSeg = DOS_GetMemory(1); //We have 16 bytes
@@ -966,6 +959,28 @@ static Bitu INT15_Handler(void) {
 	return CBRET_NONE;
 }
 
+static Bitu Default_IRQ_Handler(void) {
+	IO_WriteB(0x20,0x0b);
+	Bit8u master_isr=IO_ReadB(0x20);
+	if (master_isr) {
+		IO_WriteB(0xa0,0x0b);
+		Bit8u slave_isr=IO_ReadB(0xa0);
+		if (slave_isr) {
+			IO_WriteB(0xa1,IO_ReadB(0xa1)|slave_isr);
+			IO_WriteB(0xa0,0x20);
+		} else IO_WriteB(0x21,IO_ReadB(0x21)|(master_isr&~4));
+		IO_WriteB(0x20,0x20);
+#if C_DEBUG
+		Bit16u irq=0,isr=master_isr;
+		if (slave_isr) isr=slave_isr<<8;
+		while (isr>>=1) irq++;
+		LOG(LOG_BIOS,LOG_WARN)("Unexpected IRQ %u",irq);
+#endif
+	} else master_isr=0xff;
+	mem_writeb(BIOS_LAST_UNEXPECTED_IRQ,master_isr);
+	return CBRET_NONE;
+}
+
 static Bitu Reboot_Handler(void) {
 	// switch to text mode, notify user (let's hope INT10 still works)
 	const char* const text = "\n\n   Reboot requested, quitting now.";
@@ -1101,6 +1116,21 @@ public:
 		Bitu call_irq2=CALLBACK_Allocate();	
 		CALLBACK_Setup(call_irq2,NULL,CB_IRET_EOI_PIC1,Real2Phys(BIOS_DEFAULT_IRQ2_LOCATION),"irq 2 bios");
 		RealSetVec(0x0a,BIOS_DEFAULT_IRQ2_LOCATION);
+
+		/* Default IRQ handler */
+		Bitu call_irq_default=CALLBACK_Allocate();
+		CALLBACK_Setup(call_irq_default,&Default_IRQ_Handler,CB_IRET,"irq default");
+		RealSetVec(0x0b,CALLBACK_RealPointer(call_irq_default)); // IRQ 3
+		RealSetVec(0x0c,CALLBACK_RealPointer(call_irq_default)); // IRQ 4
+		RealSetVec(0x0d,CALLBACK_RealPointer(call_irq_default)); // IRQ 5
+		RealSetVec(0x0f,CALLBACK_RealPointer(call_irq_default)); // IRQ 7
+		RealSetVec(0x72,CALLBACK_RealPointer(call_irq_default)); // IRQ 10
+		RealSetVec(0x73,CALLBACK_RealPointer(call_irq_default)); // IRQ 11
+
+		// INT 05h: Print Screen
+		// IRQ1 handler calls it when PrtSc key is pressed; does nothing unless hooked
+		phys_writeb(Real2Phys(BIOS_DEFAULT_INT5_LOCATION),0xcf);
+		RealSetVec(0x05,BIOS_DEFAULT_INT5_LOCATION);
 
 		/* Some hardcoded vectors */
 		phys_writeb(Real2Phys(BIOS_DEFAULT_HANDLER_LOCATION),0xcf);	/* bios default interrupt vector location -> IRET */
@@ -1254,10 +1284,6 @@ public:
 		config |= 0x1000;
 		mem_writew(BIOS_CONFIGURATION,config);
 		CMOS_SetRegister(0x14,(Bit8u)(config&0xff)); //Should be updated on changes
-		/* Setup PC speaker initial state - real BIOS does this for POST beeps */
-		IO_Write(0x43,0xb6); // PIT 2 mode 3
-		IO_Write(0x42,0x28); // counter 1320
-		IO_Write(0x42,0x05);
 		/* Setup extended memory size */
 		IO_Write(0x70,0x30);
 		size_extended=IO_Read(0x71);
